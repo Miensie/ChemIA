@@ -1,32 +1,70 @@
 /**
  * ================================================================
- * chemExcel.js — Toutes les interactions Excel via Office.js
+ * chemExcel.js — Interactions Excel via Office.js
+ * Compatible Excel Desktop (Windows/macOS) et Excel Online
  *
- * Fonctions :
- *  - readSelection()      : lit la plage sélectionnée
- *  - parseCSV()           : parse un fichier CSV
- *  - writeResults()       : écrit les résultats dans une feuille
- *  - writeMatrix()        : écrit une matrice avec en-têtes
- *  - insertSVGChart()     : insère un graphique SVG comme image
- *  - markOutliers()       : colorie les cellules aberrantes
- *  - createResultSheet()  : crée ou vide une feuille de résultats
+ * Règles Office.js Desktop :
+ *  - Un seul Excel.run par opération (jamais deux Excel.run séquentiels)
+ *  - getItemOrNullObject() + isNullObject après sync
+ *  - Toutes les écritures batchées avant ctx.sync()
+ *  - getUsedRangeOrNullObject() pour feuille vide
  * ================================================================
  */
 "use strict";
 
 const ChemExcel = {
 
-  // ─── Lecture des données ────────────────────────────────────────────────────
+  // ─── Utilitaire interne ──────────────────────────────────────────────────────
 
-  /**
-   * Lit la plage sélectionnée dans Excel
-   * @param {boolean} hasHeader — la première ligne est-elle un en-tête ?
-   * @returns {{ headers: string[], data: number[][], sampleNames: string[], rawValues: any[][] }}
-   */
+  /** Dans un Excel.run actif, obtient ou crée une feuille (la vide si elle existe). */
+  async _getOrCreateSheet(ctx, name) {
+    const ws = ctx.workbook.worksheets.getItemOrNullObject(name);
+    ws.load("isNullObject");
+    await ctx.sync();
+
+    if (ws.isNullObject) {
+      const s = ctx.workbook.worksheets.add(name);
+      s.activate();
+      return s;
+    }
+    // Vider sans crasher si la feuille est vide
+    const used = ws.getUsedRangeOrNullObject();
+    used.load("isNullObject");
+    await ctx.sync();
+    if (!used.isNullObject) {
+      used.clear("All");
+      await ctx.sync();
+    }
+    ws.activate();
+    return ws;
+  },
+
+  _round(v, d) {
+    if (v === null || v === undefined || !isFinite(v)) return 0;
+    return parseFloat(Number(v).toFixed(d));
+  },
+
+  _title(sheet, text, row, w) {
+    const r = sheet.getRangeByIndexes(row, 0, 1, Math.max(w, 1));
+    r.values = [[`=== ${text} ===`]];
+    r.getCell(0, 0).format.font.bold  = true;
+    r.getCell(0, 0).format.font.color = "#005577";
+    r.getCell(0, 0).format.font.size  = 11;
+    return row + 1;
+  },
+
+  _header(range) {
+    range.format.font.bold  = true;
+    range.format.font.color = "#003040";
+    range.format.fill.color = "#CCEEEE";
+  },
+
+  // ─── Lecture plage Excel ────────────────────────────────────────────────────
+
   async readSelection(hasHeader = true) {
     return Excel.run(async (ctx) => {
       const range = ctx.workbook.getSelectedRange();
-      range.load(["values", "address", "rowCount", "columnCount"]);
+      range.load(["values", "address"]);
       await ctx.sync();
 
       const raw = range.values;
@@ -35,42 +73,38 @@ const ChemExcel = {
       let headers, dataRows, sampleNames;
 
       if (hasHeader) {
-        headers = raw[0].map((h, i) => h !== null && h !== "" ? String(h) : `V${i+1}`);
+        headers  = raw[0].map((h, i) => (h !== null && h !== "") ? String(h) : `V${i+1}`);
         dataRows = raw.slice(1);
       } else {
-        headers = raw[0].map((_, i) => `V${i+1}`);
+        headers  = raw[0].map((_, i) => `V${i+1}`);
         dataRows = raw;
       }
 
-      // Détecter si la première colonne est un identifiant texte
-      const firstColIsText = dataRows.every(row => typeof row[0] === 'string' && isNaN(parseFloat(row[0])));
+      const firstColIsText = dataRows.every(
+        row => typeof row[0] === "string" && isNaN(parseFloat(row[0]))
+      );
       if (firstColIsText) {
         sampleNames = dataRows.map(row => String(row[0]));
-        headers = headers.slice(1);
-        dataRows = dataRows.map(row => row.slice(1));
-        if (hasHeader) headers = raw[0].slice(1).map((h, i) => h !== null && h !== "" ? String(h) : `V${i+1}`);
+        headers     = headers.slice(1);
+        dataRows    = dataRows.map(row => row.slice(1));
+        if (hasHeader) headers = raw[0].slice(1).map((h, i) => (h !== null && h !== "") ? String(h) : `V${i+1}`);
       } else {
         sampleNames = dataRows.map((_, i) => `S${i+1}`);
       }
 
-      // Convertir en nombres
       const data = dataRows.map(row =>
-        row.map(v => {
-          const n = parseFloat(v);
-          return isNaN(n) ? NaN : n;
-        })
+        row.map(v => { const n = parseFloat(v); return isNaN(n) ? NaN : n; })
       );
 
       return { headers, data, sampleNames, address: range.address, nRows: data.length, nCols: headers.length };
     });
   },
 
-  /**
-   * Parse un contenu CSV
-   */
+  // ─── Parse CSV (pur JS) ──────────────────────────────────────────────────────
+
   parseCSV(text, separator = ",", hasHeader = true) {
     const lines = text.trim().split(/\r?\n/);
-    const rows  = lines.map(l => l.split(separator).map(v => v.trim().replace(/^"|"$/g, '')));
+    const rows  = lines.map(l => l.split(separator).map(v => v.trim().replace(/^"|"$/g, "")));
 
     let headers, dataRows, sampleNames;
     if (hasHeader) {
@@ -81,7 +115,9 @@ const ChemExcel = {
       dataRows = rows;
     }
 
-    const firstColIsText = dataRows.every(row => typeof row[0] === 'string' && isNaN(parseFloat(row[0])));
+    const firstColIsText = dataRows.every(
+      row => typeof row[0] === "string" && isNaN(parseFloat(row[0]))
+    );
     if (firstColIsText) {
       sampleNames = dataRows.map(row => row[0]);
       headers     = headers.slice(1);
@@ -97,248 +133,157 @@ const ChemExcel = {
     return { headers, data, sampleNames, nRows: data.length, nCols: headers.length };
   },
 
-  // ─── Écriture des résultats ──────────────────────────────────────────────────
+  // ─── Export PCA ─────────────────────────────────────────────────────────────
 
-  /**
-   * Crée ou vide une feuille avec le nom donné
-   */
-  async createResultSheet(name) {
+  async exportPCAResults(pcaResult, sampleNames, varNames) {
     return Excel.run(async (ctx) => {
-      let sheet;
-      try {
-        sheet = ctx.workbook.worksheets.getItem(name);
-        sheet.getUsedRange().clear();
-      } catch {
-        sheet = ctx.workbook.worksheets.add(name);
+      const sheet     = await this._getOrCreateSheet(ctx, "ChemAI_PCA");
+      const nComp     = pcaResult.nComp;
+      const compHdrs  = Array.from({length: nComp}, (_, i) => `PC${i+1}`);
+      let row = 0;
+
+      // Scores
+      row = this._title(sheet, "SCORES PCA", row, nComp + 1);
+      sheet.getRangeByIndexes(row, 0, 1, nComp + 1).values = [["Échantillon", ...compHdrs]];
+      this._header(sheet.getRangeByIndexes(row, 0, 1, nComp + 1));
+      row++;
+      const scoreRows = pcaResult.scores.map((s, i) => [
+        sampleNames?.[i] || `S${i + 1}`,
+        ...Array.from(s).map(v => this._round(v, 6)),
+      ]);
+      if (scoreRows.length) {
+        sheet.getRangeByIndexes(row, 0, scoreRows.length, nComp + 1).values = scoreRows;
+        row += scoreRows.length;
       }
-      sheet.activate();
-      await ctx.sync();
-      return sheet;
+      row += 2;
+
+      // Variance
+      row = this._title(sheet, "VARIANCE EXPLIQUÉE", row, 4);
+      sheet.getRangeByIndexes(row, 0, 1, 4).values = [["Composante","Valeur propre","Variance (%)","Var. cumulée (%)"]];
+      this._header(sheet.getRangeByIndexes(row, 0, 1, 4));
+      row++;
+      const varRows = pcaResult.explainedVar.map((v, i) => [
+        `PC${i + 1}`,
+        this._round(pcaResult.eigenvalues[i], 4),
+        this._round(v, 2),
+        this._round(pcaResult.cumulativeVar[i], 2),
+      ]);
+      sheet.getRangeByIndexes(row, 0, varRows.length, 4).values = varRows;
+      row += varRows.length + 2;
+
+      // Loadings
+      const vn = varNames || [];
+      if (vn.length) {
+        row = this._title(sheet, "LOADINGS", row, nComp + 1);
+        sheet.getRangeByIndexes(row, 0, 1, nComp + 1).values = [["Variable", ...compHdrs]];
+        this._header(sheet.getRangeByIndexes(row, 0, 1, nComp + 1));
+        row++;
+        const loadRows = vn.map((name, j) => [
+          name,
+          ...pcaResult.loadings.map(l => this._round(Array.from(l)[j] ?? 0, 6)),
+        ]);
+        sheet.getRangeByIndexes(row, 0, loadRows.length, nComp + 1).values = loadRows;
+      }
+
+      await ctx.sync();  // UN SEUL sync à la fin
     });
   },
 
-  /**
-   * Écrit une matrice dans la feuille active à partir de la cellule (row, col)
-   * @param {string}   sheetName
-   * @param {string[]} headers
-   * @param {any[][]}  data         — lignes de données
-   * @param {string[]} rowLabels    — étiquettes de ligne
-   * @param {number}   startRow     — 0-indexed
-   * @param {number}   startCol
-   * @param {string}   [title]
-   */
-  async writeMatrix(sheetName, headers, data, rowLabels, startRow = 0, startCol = 0, title) {
+  // ─── Export PLS ─────────────────────────────────────────────────────────────
+
+  async exportPLSResults(plsModel, yReal, yPred, vip, varNames, sampleNames) {
     return Excel.run(async (ctx) => {
-      const sheet = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
-      await ctx.sync();
+      const sheet = await this._getOrCreateSheet(ctx, "ChemAI_PLS");
+      let row = 0;
 
-      const ws = sheet.isNullObject
-        ? ctx.workbook.worksheets.add(sheetName)
-        : sheet;
+      // Prédictions
+      row = this._title(sheet, "PRÉDICTIONS PLS", row, 4);
+      sheet.getRangeByIndexes(row, 0, 1, 4).values = [["Échantillon","Y réel","Y prédit","Résidu"]];
+      this._header(sheet.getRangeByIndexes(row, 0, 1, 4));
+      row++;
+      const yr = yReal || [], yp = yPred || [];
+      const predRows = yr.map((y, i) => [
+        sampleNames?.[i] || `S${i + 1}`,
+        this._round(y, 4),
+        this._round(yp[i] ?? 0, 4),
+        this._round((yp[i] ?? 0) - y, 4),
+      ]);
+      if (predRows.length) {
+        sheet.getRangeByIndexes(row, 0, predRows.length, 4).values = predRows;
+        row += predRows.length;
+      }
+      row += 2;
 
-      let r = startRow;
-
-      // Titre
-      if (title) {
-        const titleRange = ws.getRangeByIndexes(r, startCol, 1, headers.length + 1);
-        titleRange.values = [[title, ...new Array(headers.length).fill("")]];
-        titleRange.getCell(0, 0).format.font.bold = true;
-        titleRange.getCell(0, 0).format.font.color = "#00E5FF";
-        titleRange.getCell(0, 0).format.font.size = 12;
-        r++;
+      // VIP
+      if (vip && vip.length) {
+        row = this._title(sheet, "VIP SCORES", row, 3);
+        sheet.getRangeByIndexes(row, 0, 1, 3).values = [["Variable","VIP Score","Importance"]];
+        this._header(sheet.getRangeByIndexes(row, 0, 1, 3));
+        row++;
+        const vipRows = vip
+          .map((v, i) => ({ name: varNames?.[i] || `V${i + 1}`, v: this._round(v, 4) }))
+          .sort((a, b) => b.v - a.v)
+          .map(d => [d.name, d.v, d.v >= 1 ? "Important" : d.v >= 0.8 ? "Modéré" : "Faible"]);
+        sheet.getRangeByIndexes(row, 0, vipRows.length, 3).values = vipRows;
       }
 
-      // En-têtes
-      const headerValues = rowLabels ? ["", ...headers] : headers;
-      const headerRange = ws.getRangeByIndexes(r, startCol, 1, headerValues.length);
-      headerRange.values = [headerValues];
-      headerRange.format.font.bold = true;
-      headerRange.format.fill.color = "#0D1825";
-      headerRange.format.font.color = "#00E5FF";
-      r++;
+      await ctx.sync();
+    });
+  },
 
-      // Données
-      const allRows = data.map((row, i) => rowLabels ? [rowLabels[i], ...row] : row);
-      if (allRows.length > 0) {
-        const dataRange = ws.getRangeByIndexes(r, startCol, allRows.length, allRows[0].length);
-        dataRange.values = allRows;
-        // Alternance de couleurs
-        for (let ri = 0; ri < allRows.length; ri++) {
-          const rowRange = ws.getRangeByIndexes(r + ri, startCol, 1, allRows[0].length);
-          rowRange.format.fill.color = ri % 2 === 0 ? "#0D1825" : "#122035";
-          rowRange.format.font.color = "#B0C8DA";
+  // ─── Export Clusters ─────────────────────────────────────────────────────────
+
+  async exportClusterLabels(labels, sampleNames) {
+    return Excel.run(async (ctx) => {
+      const sheet = await this._getOrCreateSheet(ctx, "ChemAI_Clusters");
+
+      sheet.getRangeByIndexes(0, 0, 1, 2).values = [["Échantillon","Cluster"]];
+      this._header(sheet.getRangeByIndexes(0, 0, 1, 2));
+
+      if (labels && labels.length) {
+        // Écriture en une seule opération (pas de boucle par ligne)
+        const dataRows = labels.map((l, i) => [sampleNames?.[i] || `S${i + 1}`, l + 1]);
+        sheet.getRangeByIndexes(1, 0, dataRows.length, 2).values = dataRows;
+
+        // Couleur par cluster — couleurs Excel standard, lisibles sur fond blanc
+        const clusterColors = ["#C6EFCE","#FFEB9C","#FFC7CE","#BDD7EE","#E2EFDA","#FCE4D6","#DDEBF7","#FFF2CC"];
+        const maxK = Math.max(...labels) + 1;
+        for (let k = 0; k < Math.min(maxK, clusterColors.length); k++) {
+          labels.forEach((l, i) => {
+            if (l === k) {
+              sheet.getRangeByIndexes(i + 1, 1, 1, 1).format.fill.color = clusterColors[k];
+            }
+          });
         }
       }
 
       await ctx.sync();
-      return { endRow: r + allRows.length };
     });
   },
 
-  /**
-   * Exporte les scores PCA dans Excel
-   */
-  async exportPCAResults(pcaResult, sampleNames, varNames) {
-    const sheetName = "ChemAI_PCA";
-    await this.createResultSheet(sheetName);
+  // ─── Marquage outliers ───────────────────────────────────────────────────────
 
-    const nComp = pcaResult.nComp;
-    const compHeaders = Array.from({length: nComp}, (_, i) => `PC${i+1}`);
-
-    // Scores
-    await this.writeMatrix(
-      sheetName,
-      compHeaders,
-      pcaResult.scores.map(row => row.map(v => +v.toFixed(6))),
-      sampleNames,
-      0, 0,
-      "=== SCORES PCA ==="
-    );
-
-    // Variance
-    const varData = pcaResult.explainedVar.map((v, i) => [
-      pcaResult.eigenvalues[i].toFixed(4),
-      v.toFixed(2),
-      pcaResult.cumulativeVar[i].toFixed(2),
-    ]);
-    const res = await this.writeMatrix(sheetName, ["Valeur propre", "Variance (%)", "Var. cumulée (%)"],
-      varData, compHeaders.map((_, i) => `PC${i+1}`),
-      pcaResult.scores.length + 4, 0, "=== VARIANCE EXPLIQUÉE ==="
-    );
-
-    // Loadings
-    await this.writeMatrix(
-      sheetName, varNames,
-      pcaResult.loadings.map(row => Array.from(row).map(v => +v.toFixed(6))),
-      compHeaders.map((_, i) => `PC${i+1}`),
-      res.endRow + 3, 0, "=== LOADINGS ==="
-    );
-  },
-
-  /**
-   * Exporte les résultats PLS
-   */
-  async exportPLSResults(plsModel, yReal, yPred, vip, varNames, sampleNames) {
-    const sheetName = "ChemAI_PLS";
-    await this.createResultSheet(sheetName);
-
-    // Prédictions
-    const predData = yReal.map((y, i) => [y, +yPred[i].toFixed(4), +(yPred[i]-y).toFixed(4)]);
-    const res = await this.writeMatrix(sheetName, ["Y réel", "Y prédit", "Résidu"],
-      predData, sampleNames, 0, 0, "=== PRÉDICTIONS PLS ==="
-    );
-
-    // VIP
-    const vipData = vip.map((v, i) => [+(v).toFixed(4), v >= 1 ? "Important" : v >= 0.8 ? "Modéré" : "Faible"]);
-    const sortedVIP = vipData.map((d, i) => ({name: varNames[i], ...d}))
-      .sort((a, b) => b[0] - a[0]);
-    await this.writeMatrix(sheetName, ["VIP Score", "Importance"],
-      sortedVIP.map(d => [d[0], d[1]]),
-      sortedVIP.map(d => d.name),
-      res.endRow + 3, 0, "=== VIP SCORES ==="
-    );
-  },
-
-  /**
-   * Exporte les labels de cluster et marque les cellules
-   */
-  async exportClusterLabels(labels, sampleNames) {
-    const sheetName = "ChemAI_Clusters";
-    await this.createResultSheet(sheetName);
-
-    const clusterColors = ["#00E5FF","#00E676","#FF9800","#CE93D8","#FF5252","#FFEB3B","#40C4FF","#FF80AB"];
-    const data = labels.map((l, i) => [sampleNames[i] || `S${i+1}`, l + 1]);
+  async markOutliers(outlierIndices, startAddress) {
+    if (!outlierIndices || !outlierIndices.length) return;
 
     return Excel.run(async (ctx) => {
-      const ws = ctx.workbook.worksheets.getItemOrNullObject(sheetName);
+      const sheet = ctx.workbook.worksheets.getActiveWorksheet();
+      const ref   = sheet.getRange(startAddress || "A1");
+      ref.load("rowIndex");
       await ctx.sync();
-      const sheet = ws.isNullObject ? ctx.workbook.worksheets.add(sheetName) : ws;
 
-      // En-têtes
-      sheet.getRangeByIndexes(0, 0, 1, 2).values = [["Échantillon", "Cluster"]];
-      sheet.getRangeByIndexes(0, 0, 1, 2).format.font.bold = true;
-
-      data.forEach(([name, cluster], i) => {
-        const row = sheet.getRangeByIndexes(i + 1, 0, 1, 2);
-        row.values = [[name, cluster]];
-        const col = clusterColors[(cluster - 1) % clusterColors.length];
-        row.getCell(0, 1).format.fill.color = col + "55"; // semi-transparent
+      const base = ref.rowIndex || 0;
+      // Batch toutes les opérations de style avant sync
+      outlierIndices.slice(0, 100).forEach(idx => {
+        const r = sheet.getRangeByIndexes(base + idx + 1, 0, 1, 20);
+        r.format.fill.color = "#FFCCCC";
+        const b = r.format.borders.getItem("EdgeLeft");
+        b.style  = "Continuous";
+        b.color  = "#FF0000";
+        b.weight = "Thick";
       });
 
       await ctx.sync();
-    });
-  },
-
-  /**
-   * Marque les outliers dans la feuille active avec une bordure rouge
-   */
-  async markOutliers(outlierIndices, startAddress) {
-    return Excel.run(async (ctx) => {
-      const sheet = ctx.workbook.worksheets.getActiveWorksheet();
-      const refRange = sheet.getRange(startAddress);
-      refRange.load("rowIndex");
-      await ctx.sync();
-
-      for (const idx of outlierIndices) {
-        const row = sheet.getRangeByIndexes(refRange.rowIndex + idx + 1, 0, 1, 20);
-        row.format.fill.color = "#FF525220";
-        row.format.borders.getItem("EdgeLeft").style = "Continuous";
-        row.format.borders.getItem("EdgeLeft").color = "#FF5252";
-        row.format.borders.getItem("EdgeLeft").weight = "Thick";
-      }
-      await ctx.sync();
-    });
-  },
-
-  /**
-   * Insère un SVG comme image dans Excel (via conversion canvas → blob)
-   * Note : Office.js ne supporte pas directement SVG.
-   * On encode en data URI et on insère via insertPictureFromBase64.
-   */
-  async insertChartFromSVG(svgString, sheetName, cellAddress) {
-    // Conversion SVG → PNG via Canvas (navigateur)
-    return new Promise((resolve, reject) => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width  = 800;
-        canvas.height = 520;
-        const ctx2d = canvas.getContext("2d");
-
-        const img = new Image();
-        const blob = new Blob([svgString], { type: "image/svg+xml" });
-        const url  = URL.createObjectURL(blob);
-
-        img.onload = async () => {
-          ctx2d.fillStyle = "#080F1A";
-          ctx2d.fillRect(0, 0, canvas.width, canvas.height);
-          ctx2d.drawImage(img, 0, 0, canvas.width, canvas.height);
-          URL.revokeObjectURL(url);
-
-          const base64 = canvas.toDataURL("image/png").split(",")[1];
-
-          await Excel.run(async (exCtx) => {
-            const ws = exCtx.workbook.worksheets.getItemOrNullObject(sheetName);
-            await exCtx.sync();
-            const sheet = ws.isNullObject ? exCtx.workbook.worksheets.add(sheetName) : ws;
-            const range = sheet.getRange(cellAddress);
-            range.load("top,left");
-            await exCtx.sync();
-
-            // Insérer l'image
-            const shape = sheet.shapes.addImage(base64);
-            shape.top  = range.top;
-            shape.left = range.left;
-            shape.width  = 400;
-            shape.height = 260;
-            await exCtx.sync();
-          });
-
-          resolve();
-        };
-
-        img.onerror = reject;
-        img.src = url;
-      } catch (e) { reject(e); }
     });
   },
 };
