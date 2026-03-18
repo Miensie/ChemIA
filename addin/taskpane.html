@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>ChemAI — Chimiométrie</title>
+
+  <!-- Office.js -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="../styles/taskpane.css"/>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-icon">⬡</div>
+    <div>
+      <div class="brand-name">Chem<span class="accent">AI</span></div>
+      <div class="brand-sub">Chimiométrie Multivariée</div>
+    </div>
+  </div>
+  <div id="hdr-status" class="hdr-status">Initialisation…</div>
+</header>
+
+<!-- ═══ NAV ═══ -->
+<nav class="nav">
+  <button class="ntab active" data-panel="p-data">
+    <span class="ni">⊡</span><span class="nl">Données</span>
+  </button>
+  <button class="ntab" data-panel="p-preproc">
+    <span class="ni">⟳</span><span class="nl">Prétraitement</span>
+  </button>
+  <button class="ntab" data-panel="p-pca">
+    <span class="ni">◈</span><span class="nl">PCA</span>
+  </button>
+  <button class="ntab" data-panel="p-pls">
+    <span class="ni">∿</span><span class="nl">PLS</span>
+  </button>
+  <button class="ntab" data-panel="p-cluster">
+    <span class="ni">⬡</span><span class="nl">Clustering</span>
+  </button>
+  <button class="ntab" data-panel="p-anomaly">
+    <span class="ni">⚠</span><span class="nl">Anomalies</span>
+  </button>
+  <button class="ntab" data-panel="p-report">
+    <span class="ni">▤</span><span class="nl">Rapport</span>
+  </button>
+</nav>
+
+<main class="main">
+
+  <!-- ═══ PANEL : DONNÉES ═══ -->
+  <section id="p-data" class="panel active">
+    <div class="ph">
+      <h2>Importation des données</h2>
+      <p class="ps">Sélectionnez une plage Excel ou importez un fichier CSV.</p>
+    </div>
+
+    <div class="card">
+      <div class="cl">SOURCE DE DONNÉES</div>
+      <div class="source-btns">
+        <button class="btn btn-primary" id="btn-read-excel">⊞ Lire la sélection Excel</button>
+        <label class="btn btn-sec" id="btn-csv-label">
+          ↑ Importer CSV
+          <input type="file" id="csv-input" accept=".csv" style="display:none"/>
+        </label>
+      </div>
+      <div class="fg2" style="margin-top:10px">
+        <div class="ff">
+          <label>Ligne d'en-tête</label>
+          <select id="header-row" class="sel">
+            <option value="1">Ligne 1</option>
+            <option value="0">Aucune</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Séparateur CSV</label>
+          <select id="csv-sep" class="sel">
+            <option value=",">Virgule ( , )</option>
+            <option value=";">Point-virgule ( ; )</option>
+            <option value="\t">Tabulation</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="data-preview-card" style="display:none">
+      <div class="cl">APERÇU DES DONNÉES — <span id="data-shape">0 × 0</span></div>
+      <div class="tscroll">
+        <table class="dt" id="data-preview-table">
+          <thead id="data-preview-thead"></thead>
+          <tbody id="data-preview-tbody"></tbody>
+        </table>
+      </div>
+      <div id="data-stats" class="data-stats-row"></div>
+    </div>
+
+    <div class="card" id="col-config-card" style="display:none">
+      <div class="cl">CONFIGURATION DES COLONNES</div>
+      <p class="cn">Définissez le rôle de chaque colonne.</p>
+      <div id="col-roles"></div>
+    </div>
+
+    <div class="card" id="analyze-card" style="display:none">
+      <button class="btn btn-primary btn-xl" id="btn-analyze">◈ Analyser les données</button>
+    </div>
+    <div id="log-data" class="logp"></div>
+  </section>
+
+  <!-- ═══ PANEL : PRÉTRAITEMENT ═══ -->
+  <section id="p-preproc" class="panel">
+    <div class="ph">
+      <h2>Prétraitement des données</h2>
+      <p class="ps">Normalisez et préparez vos données avant l'analyse.</p>
+    </div>
+    <div class="card">
+      <div class="cl">MÉTHODE DE MISE À L'ÉCHELLE</div>
+      <div class="radio-group">
+        <label class="radio-row"><input type="radio" name="scaling" value="none" checked/>
+          <div><strong>Aucun</strong><span>Données brutes</span></div></label>
+        <label class="radio-row"><input type="radio" name="scaling" value="center"/>
+          <div><strong>Centrage</strong><span>X − μ</span></div></label>
+        <label class="radio-row"><input type="radio" name="scaling" value="standardize"/>
+          <div><strong>Standardisation (autoscaling)</strong><span>(X − μ) / σ</span></div></label>
+        <label class="radio-row"><input type="radio" name="scaling" value="normalize"/>
+          <div><strong>Normalisation min-max [0, 1]</strong><span>(X − Xmin) / (Xmax − Xmin)</span></div></label>
+        <label class="radio-row"><input type="radio" name="scaling" value="pareto"/>
+          <div><strong>Pareto scaling</strong><span>(X − μ) / √σ</span></div></label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cl">GESTION DES VALEURS MANQUANTES</div>
+      <div class="fg2">
+        <div class="ff">
+          <label>Stratégie</label>
+          <select id="missing-strategy" class="sel">
+            <option value="mean">Remplacement par la moyenne</option>
+            <option value="median">Remplacement par la médiane</option>
+            <option value="zero">Remplacement par zéro</option>
+            <option value="drop">Suppression des lignes</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Seuil NaN (%)</label>
+          <input type="number" id="nan-threshold" value="30" min="0" max="100" step="5"/>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cl">STATISTIQUES DESCRIPTIVES</div>
+      <div class="tscroll" id="desc-stats-wrap">
+        <p class="cn">Importez des données pour afficher les statistiques.</p>
+      </div>
+    </div>
+    <div class="card">
+      <button class="btn btn-primary" id="btn-preprocess">⟳ Appliquer le prétraitement</button>
+    </div>
+  </section>
+
+  <!-- ═══ PANEL : PCA ═══ -->
+  <section id="p-pca" class="panel">
+    <div class="ph">
+      <h2>Analyse en Composantes Principales</h2>
+      <p class="ps">PCA — Réduction de dimension et visualisation de la structure des données.</p>
+    </div>
+    <div class="card">
+      <div class="cl">PARAMÈTRES PCA</div>
+      <div class="fg2">
+        <div class="ff">
+          <label>Nombre de composantes</label>
+          <select id="pca-ncomp" class="sel">
+            <option value="auto">Automatique (95% variance)</option>
+            <option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Algorithme</label>
+          <select id="pca-algo" class="sel">
+            <option value="svd">SVD (recommandé)</option>
+            <option value="nipals">NIPALS</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btn-run-pca" style="margin-top:10px">◈ Lancer la PCA</button>
+    </div>
+    <div id="pca-results" style="display:none">
+      <div class="card">
+        <div class="cl">VARIANCE EXPLIQUÉE</div>
+        <div id="pca-variance-bars"></div>
+        <div class="tscroll" style="margin-top:8px">
+          <table class="dt" id="pca-variance-table">
+            <thead><tr><th>Composante</th><th>Valeur propre</th><th>Variance (%)</th><th>Var. cumulée (%)</th></tr></thead>
+            <tbody id="pca-variance-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cl">GRAPHIQUES PCA</div>
+        <div class="chart-tabs">
+          <button class="ctab active" data-chart="score">Score Plot</button>
+          <button class="ctab" data-chart="loading">Loading Plot</button>
+          <button class="ctab" data-chart="scree">Scree Plot</button>
+        </div>
+        <div class="chart-axes-row">
+          <label>PC X <select id="pca-pc-x" class="sel-sm"></select></label>
+          <label>PC Y <select id="pca-pc-y" class="sel-sm"></select></label>
+        </div>
+        <div id="pca-chart-wrap" class="chart-wrap"></div>
+        <button class="btn btn-sec" id="btn-pca-to-excel" style="margin-top:8px">⊞ Exporter vers Excel</button>
+      </div>
+      <div class="card">
+        <div class="cl">LOADINGS</div>
+        <div class="tscroll">
+          <table class="dt" id="pca-loadings-table">
+            <thead id="pca-loadings-thead"></thead>
+            <tbody id="pca-loadings-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cl">INTERPRÉTATION IA</div>
+        <button class="btn btn-primary" id="btn-ai-pca">✦ Interpréter la PCA</button>
+        <div id="ai-pca-result" class="ai-box" style="display:none"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PANEL : PLS ═══ -->
+  <section id="p-pls" class="panel">
+    <div class="ph">
+      <h2>Régression PLS</h2>
+      <p class="ps">Partial Least Squares — Modélisation prédictive et validation croisée.</p>
+    </div>
+    <div class="card">
+      <div class="cl">CONFIGURATION PLS</div>
+      <div class="fg2">
+        <div class="ff"><label>Variable Y (réponse)</label><select id="pls-y-col" class="sel"></select></div>
+        <div class="ff">
+          <label>Composantes LV</label>
+          <select id="pls-ncomp" class="sel">
+            <option value="auto">Automatique (CV)</option>
+            <option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Validation croisée</label>
+          <select id="pls-cv" class="sel">
+            <option value="5">K-Fold k=5</option>
+            <option value="10">K-Fold k=10</option>
+            <option value="loo">Leave-One-Out</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Ratio test/train</label>
+          <select id="pls-split" class="sel">
+            <option value="0.2">80/20</option>
+            <option value="0.3">70/30</option>
+            <option value="0.25">75/25</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btn-run-pls" style="margin-top:10px">∿ Construire le modèle PLS</button>
+    </div>
+    <div id="pls-results" style="display:none">
+      <div class="card"><div class="cl">MÉTRIQUES</div><div class="stat-grid" id="pls-metrics"></div></div>
+      <div class="card">
+        <div class="cl">GRAPHIQUES PLS</div>
+        <div class="chart-tabs">
+          <button class="ctab active" data-chart="pls-pred">Prédit vs Réel</button>
+          <button class="ctab" data-chart="pls-vip">VIP Scores</button>
+          <button class="ctab" data-chart="pls-resid">Résidus</button>
+        </div>
+        <div id="pls-chart-wrap" class="chart-wrap"></div>
+        <button class="btn btn-sec" id="btn-pls-to-excel" style="margin-top:8px">⊞ Exporter vers Excel</button>
+      </div>
+      <div class="card">
+        <div class="cl">PRÉDICTION</div>
+        <p class="cn">Sélectionnez une plage de nouvelles mesures (sans Y) pour prédire.</p>
+        <button class="btn btn-sec" id="btn-pls-predict">↓ Prédire la sélection</button>
+      </div>
+      <div class="card">
+        <div class="cl">INTERPRÉTATION IA</div>
+        <button class="btn btn-primary" id="btn-ai-pls">✦ Interpréter le modèle PLS</button>
+        <div id="ai-pls-result" class="ai-box" style="display:none"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PANEL : CLUSTERING ═══ -->
+  <section id="p-cluster" class="panel">
+    <div class="ph">
+      <h2>Clustering</h2>
+      <p class="ps">K-Means et clustering hiérarchique avec visualisations.</p>
+    </div>
+    <div class="card">
+      <div class="cl">MÉTHODE DE CLUSTERING</div>
+      <div class="fg2">
+        <div class="ff">
+          <label>Algorithme</label>
+          <select id="cluster-method" class="sel">
+            <option value="kmeans">K-Means</option>
+            <option value="hierarchical">Hiérarchique (Ward)</option>
+            <option value="both">Les deux</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Nombre de clusters k</label>
+          <select id="cluster-k" class="sel">
+            <option value="auto">Automatique (Elbow)</option>
+            <option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option><option value="5">5</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Liaison (hiérarchique)</label>
+          <select id="cluster-linkage" class="sel">
+            <option value="ward">Ward</option>
+            <option value="complete">Complete</option>
+            <option value="average">Average</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Espace</label>
+          <select id="cluster-space" class="sel">
+            <option value="pca">Espace PCA</option>
+            <option value="original">Données originales</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btn-run-cluster" style="margin-top:10px">⬡ Lancer le clustering</button>
+    </div>
+    <div id="cluster-results" style="display:none">
+      <div class="card"><div class="cl">RÉSULTATS</div><div class="stat-grid" id="cluster-metrics"></div></div>
+      <div class="card">
+        <div class="cl">GRAPHIQUES</div>
+        <div class="chart-tabs">
+          <button class="ctab active" data-chart="cluster-scatter">Scatter clusters</button>
+          <button class="ctab" data-chart="dendro">Dendrogramme</button>
+          <button class="ctab" data-chart="heatmap">Heatmap</button>
+          <button class="ctab" data-chart="elbow">Méthode Elbow</button>
+        </div>
+        <div id="cluster-chart-wrap" class="chart-wrap"></div>
+        <button class="btn btn-sec" id="btn-cluster-to-excel" style="margin-top:8px">⊞ Exporter labels vers Excel</button>
+      </div>
+      <div class="card">
+        <div class="cl">INTERPRÉTATION IA</div>
+        <button class="btn btn-primary" id="btn-ai-cluster">✦ Interpréter les clusters</button>
+        <div id="ai-cluster-result" class="ai-box" style="display:none"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PANEL : ANOMALIES ═══ -->
+  <section id="p-anomaly" class="panel">
+    <div class="ph">
+      <h2>Détection d'anomalies</h2>
+      <p class="ps">Distance de Mahalanobis, T² de Hotelling, et Q résiduel.</p>
+    </div>
+    <div class="card">
+      <div class="cl">MÉTHODE DE DÉTECTION</div>
+      <div class="fg2">
+        <div class="ff">
+          <label>Méthode</label>
+          <select id="anomaly-method" class="sel">
+            <option value="mahalanobis">Distance de Mahalanobis</option>
+            <option value="hotelling">T² de Hotelling (PCA)</option>
+            <option value="q_residual">Q résiduel (PCA)</option>
+            <option value="combined">Combiné T² + Q</option>
+          </select>
+        </div>
+        <div class="ff">
+          <label>Seuil α (risque)</label>
+          <select id="anomaly-alpha" class="sel">
+            <option value="0.05">5% (α = 0.05)</option>
+            <option value="0.01">1% (α = 0.01)</option>
+            <option value="0.001">0.1% (α = 0.001)</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btn-run-anomaly" style="margin-top:10px">⚠ Détecter les anomalies</button>
+    </div>
+    <div id="anomaly-results" style="display:none">
+      <div class="card"><div class="cl">RÉSUMÉ</div><div id="anomaly-summary" class="anomaly-summary"></div></div>
+      <div class="card"><div class="cl">GRAPHIQUE DE CONTRÔLE</div><div id="anomaly-chart-wrap" class="chart-wrap"></div></div>
+      <div class="card">
+        <div class="cl">ÉCHANTILLONS ABERRANTS</div>
+        <div class="tscroll">
+          <table class="dt" id="anomaly-table">
+            <thead><tr><th>Échantillon</th><th>Score</th><th>Seuil</th><th>Statut</th></tr></thead>
+            <tbody id="anomaly-tbody"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-sec" id="btn-anomaly-to-excel" style="margin-top:8px">⊞ Marquer dans Excel</button>
+      </div>
+      <div class="card">
+        <div class="cl">INTERPRÉTATION IA</div>
+        <button class="btn btn-primary" id="btn-ai-anomaly">✦ Analyser les anomalies</button>
+        <div id="ai-anomaly-result" class="ai-box" style="display:none"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PANEL : RAPPORT ═══ -->
+  <section id="p-report" class="panel">
+    <div class="ph">
+      <h2>Rapport chimiométrique</h2>
+      <p class="ps">Rapport scientifique complet avec graphiques et interprétation IA.</p>
+    </div>
+    <div class="card">
+      <div class="cl">CONFIGURATION API IA</div>
+      <div class="input-row">
+        <input type="password" id="ai-api-key" placeholder="Clé API Gemini (AIza…)" autocomplete="off"/>
+        <button class="btn-icon" id="btn-save-key" title="Sauvegarder">💾</button>
+      </div>
+      <div class="api-note">Modèle : gemini-2.5-flash-lite · <a href="https://aistudio.google.com" target="_blank">aistudio.google.com</a></div>
+    </div>
+    <div class="card">
+      <div class="cl">EN-TÊTE DU RAPPORT</div>
+      <div class="fg2">
+        <div class="ff"><label>Laboratoire</label><input type="text" id="rpt-labo" placeholder="Nom du laboratoire"/></div>
+        <div class="ff"><label>Auteur</label><input type="text" id="rpt-auteur" placeholder="Prénom NOM"/></div>
+        <div class="ff"><label>Référence</label><input type="text" id="rpt-ref" placeholder="CHEM-2025-001"/></div>
+        <div class="ff"><label>Version</label><input type="text" id="rpt-version" value="1.0"/></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cl">SECTIONS À INCLURE</div>
+      <div class="cb-list">
+        <label class="cbrow"><input type="checkbox" id="rpt-data"    checked/> Description des données</label>
+        <label class="cbrow"><input type="checkbox" id="rpt-preproc" checked/> Prétraitement</label>
+        <label class="cbrow"><input type="checkbox" id="rpt-pca"     checked/> Analyse PCA</label>
+        <label class="cbrow"><input type="checkbox" id="rpt-pls"     checked/> Régression PLS</label>
+        <label class="cbrow"><input type="checkbox" id="rpt-cluster" checked/> Clustering</label>
+        <label class="cbrow"><input type="checkbox" id="rpt-anomaly" checked/> Détection d'anomalies</label>
+        <label class="cbrow"><input type="checkbox" id="rpt-ai"      checked/> Interprétation IA globale</label>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cl">EXPORT</div>
+      <div class="export-btns">
+        <button class="btn btn-primary" id="btn-report-html">🌐 Rapport HTML</button>
+        <button class="btn btn-sec" id="btn-report-excel">⊞ Classeur Excel complet</button>
+      </div>
+    </div>
+    <div id="log-report" class="logp"></div>
+  </section>
+
+</main>
+
+<div id="toast-ct"></div>
+
+<!-- ═══ SCRIPTS (ordre important) ═══ -->
+<script src="../scripts/chemMath.js"></script>
+<script src="../scripts/chemCharts.js"></script>
+<script src="../scripts/chemExcel.js"></script>
+<script src="../scripts/chemAI.js"></script>
+<script src="../scripts/chemBackend.js"></script>
+<script src="../scripts/chemReport.js"></script>
+<script src="taskpane-standalone.js"></script>
+
+</body>
+</html>

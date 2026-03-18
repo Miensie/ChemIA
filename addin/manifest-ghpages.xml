@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  manifest-ghpages.xml
+  Utiliser ce manifest pour charger l'Add-in depuis GitHub Pages.
+  Remplacez VOTRE-USERNAME par votre nom d'utilisateur GitHub.
+  Remplacez chemai-addin par le nom de votre dépôt GitHub.
+-->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
+
+  <Id>8f3e2a1b-4c7d-4e9f-8b2a-1c3d5e7f9a0b</Id>
+  <Version>2.0.0</Version>
+  <ProviderName>ChemAI Lab</ProviderName>
+  <DefaultLocale>fr-FR</DefaultLocale>
+  <DisplayName DefaultValue="ChemAI — Chimiométrie"/>
+  <Description DefaultValue="Analyse multivariée scientifique pour laboratoires analytiques"/>
+  <IconUrl DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-64.png"/>
+  <SupportUrl DefaultValue="https://github.com/VOTRE-USERNAME/chemai-addin"/>
+  <AppDomains>
+    <AppDomain>https://VOTRE-USERNAME.github.io</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook"/>
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/addin/taskpane.html"/>
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
+          </GetStarted>
+          <FunctionFile resid="Commands.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="CommandsGroup">
+                <Label resid="CommandsGroup.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="TaskpaneButton">
+                  <Label resid="TaskpaneButton.Label"/>
+                  <Supertip>
+                    <Title resid="TaskpaneButton.Label"/>
+                    <Description resid="TaskpaneButton.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>ButtonId1</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16x16" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/VOTRE-USERNAME/chemai-addin"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/addin/commands.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/addin/taskpane.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Bienvenue dans ChemAI"/>
+        <bt:String id="CommandsGroup.Label" DefaultValue="ChemAI"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="ChemAI Analyse"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Chimiométrie multivariée avec IA directement dans Excel."/>
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Ouvrir ChemAI pour l'analyse chimiométrique."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>ChemAI — Add-in Excel de Chimiométrie</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #080F1A;
+      --bg2:     #0D1825;
+      --bg3:     #122035;
+      --border:  #1A2E47;
+      --border2: #243B57;
+      --cyan:    #00E5FF;
+      --cyan2:   #0099BB;
+      --green:   #00E676;
+      --orange:  #FF9800;
+      --purple:  #CE93D8;
+      --blue:    #40C4FF;
+      --text:    #D0E4F0;
+      --dim:     #7B9DB8;
+      --faint:   #3A5570;
+      --mono:    'Space Mono', monospace;
+      --sans:    'Syne', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── Grid bg ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: .35;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      background: rgba(8,15,26,.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      height: 56px;
+    }
+
+    .nav-brand {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.02em;
+    }
+    .nav-brand span { color: var(--cyan); }
+
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--dim);
+      text-decoration: none;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      transition: color .15s;
+    }
+    .nav-links a:hover { color: var(--cyan); }
+
+    .nav-cta {
+      background: var(--cyan);
+      color: var(--bg) !important;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-weight: 700 !important;
+      transition: box-shadow .15s !important;
+    }
+    .nav-cta:hover { box-shadow: 0 0 18px rgba(0,229,255,.4); color: var(--bg) !important; }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 24px 60px;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--cyan);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+      animation: fadeUp .6s ease both;
+    }
+    .hero-badge .dot {
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
+
+    .hero-title {
+      font-size: clamp(42px, 7vw, 80px);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -.03em;
+      margin-bottom: 8px;
+      animation: fadeUp .7s .1s ease both;
+    }
+    .hero-title .accent {
+      color: var(--cyan);
+      text-shadow: 0 0 40px rgba(0,229,255,.4);
+    }
+
+    .hero-sub {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--dim);
+      letter-spacing: .04em;
+      margin-bottom: 18px;
+      animation: fadeUp .7s .15s ease both;
+    }
+
+    .hero-desc {
+      max-width: 580px;
+      font-size: 15px;
+      color: var(--dim);
+      line-height: 1.7;
+      margin-bottom: 36px;
+      animation: fadeUp .7s .2s ease both;
+    }
+
+    .hero-btns {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: fadeUp .7s .25s ease both;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 13px 28px;
+      border-radius: 8px;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all .15s;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--cyan);
+      color: var(--bg);
+    }
+    .btn-primary:hover { box-shadow: 0 0 24px rgba(0,229,255,.5); transform: translateY(-1px); }
+
+    .btn-sec {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border2);
+    }
+    .btn-sec:hover { border-color: var(--cyan2); color: var(--cyan); transform: translateY(-1px); }
+
+    /* ── Modules strip ── */
+    .modules-strip {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 48px;
+      animation: fadeUp .7s .35s ease both;
+    }
+    .module-chip {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .module-chip.hi { border-color: var(--cyan2); color: var(--cyan); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Section commune ── */
+    section {
+      position: relative;
+      z-index: 1;
+      padding: 80px 24px;
+    }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--cyan2);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(26px, 4vw, 40px);
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 14px;
+    }
+
+    .section-desc {
+      font-size: 14px;
+      color: var(--dim);
+      line-height: 1.7;
+      max-width: 560px;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    /* ── Features grid ── */
+    #features { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin-top: 48px;
+    }
+
+    .feat-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color .2s, transform .2s;
+    }
+    .feat-card:hover { border-color: var(--cyan2); transform: translateY(-3px); }
+
+    .feat-icon {
+      font-size: 28px;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .feat-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .feat-desc {
+      font-size: 12px;
+      color: var(--dim);
+      line-height: 1.6;
+    }
+
+    .feat-tags {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .tag {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--dim);
+      letter-spacing: .04em;
+    }
+    .tag.cyan { border-color: var(--cyan2); color: var(--cyan); }
+    .tag.green { border-color: #00E67640; color: var(--green); }
+    .tag.orange { border-color: #FF980040; color: var(--orange); }
+
+    /* ── Architecture ── */
+    #architecture { }
+
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 48px;
+    }
+
+    @media (max-width: 700px) { .arch-grid { grid-template-columns: 1fr; } }
+
+    .arch-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .arch-card-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .arch-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .arch-item-icon {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--cyan);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 6px;
+      white-space: nowrap;
+      margin-top: 1px;
+    }
+    .arch-item-text strong { display: block; font-size: 12px; color: var(--text); margin-bottom: 2px; }
+    .arch-item-text span  { font-size: 11px; color: var(--dim); }
+
+    /* ── Install steps ── */
+    #install { background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 40px;
+    }
+
+    .step {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .step-num {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--cyan);
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 3px 8px;
+      display: inline-block;
+      margin-bottom: 12px;
+    }
+
+    .step-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .step-desc {
+      font-size: 11px;
+      color: var(--dim);
+      line-height: 1.6;
+    }
+
+    code, pre {
+      font-family: var(--mono);
+    }
+
+    .code-block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 10px 0;
+      font-size: 11px;
+      color: var(--cyan);
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.7;
+    }
+
+    .code-comment { color: var(--faint); }
+    .code-cmd     { color: var(--green); }
+    .code-str     { color: var(--orange); }
+
+    /* ── Modules detail ── */
+    #modules {}
+
+    .modules-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 32px;
+      font-size: 12px;
+    }
+    .modules-table th {
+      background: var(--bg2);
+      color: var(--cyan);
+      padding: 10px 14px;
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+    .modules-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      color: var(--dim);
+      vertical-align: top;
+    }
+    .modules-table tr:hover td { background: var(--bg2); color: var(--text); }
+    .modules-table td:first-child { color: var(--cyan); font-family: var(--mono); font-size: 11px; font-weight: 700; }
+    .modules-table td:last-child  { font-family: var(--mono); font-size: 10px; }
+
+    /* ── Limitation banner ── */
+    .limitation-banner {
+      background: var(--bg3);
+      border: 1px solid #FF980050;
+      border-radius: 10px;
+      padding: 16px 20px;
+      margin: 32px 0;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .lim-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+    .lim-title { font-weight: 700; font-size: 13px; color: var(--orange); margin-bottom: 4px; }
+    .lim-desc  { font-size: 12px; color: var(--dim); line-height: 1.6; }
+    .lim-desc a { color: var(--cyan); text-decoration: none; }
+    .lim-desc a:hover { text-decoration: underline; }
+
+    /* ── CTA section ── */
+    #cta {
+      text-align: center;
+      padding: 100px 24px;
+    }
+    .cta-glow {
+      position: absolute;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(0,229,255,.12), transparent 70%);
+      left: 50%; top: 50%;
+      transform: translate(-50%,-50%);
+      pointer-events: none;
+    }
+
+    /* ── Footer ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .footer-brand { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+    .footer-brand span { color: var(--cyan); }
+    .footer-links { display: flex; gap: 20px; list-style: none; }
+    .footer-links a { font-size: 11px; color: var(--dim); text-decoration: none; }
+    .footer-links a:hover { color: var(--cyan); }
+    .footer-note { font-size: 10px; color: var(--faint); }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      nav { padding: 0 16px; }
+      .nav-links { display: none; }
+      .hero-btns { flex-direction: column; align-items: center; }
+      .btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <div class="nav-brand">Chem<span>AI</span></div>
+  <ul class="nav-links">
+    <li><a href="#features">Fonctionnalités</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#install">Installation</a></li>
+    <li><a href="#modules">Modules</a></li>
+    <li><a href="addin/taskpane.html" class="nav-cta">Ouvrir l'Add-in</a></li>
+  </ul>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="dot"></span>
+    Add-in Excel · Chimiométrie · Open Source
+  </div>
+
+  <h1 class="hero-title">
+    Analyse multivariée<br>
+    <span class="accent">directement dans Excel</span>
+  </h1>
+
+  <p class="hero-sub">PCA · PLS · Clustering · Anomalies · IA · Rapport</p>
+
+  <p class="hero-desc">
+    ChemAI est un Add-in Microsoft Excel professionnel pour les laboratoires analytiques,
+    chercheurs et ingénieurs chimistes. Il apporte la puissance de la chimiométrie
+    multivariée sans quitter votre environnement de travail.
+  </p>
+
+  <div class="hero-btns">
+    <a href="addin/taskpane.html" class="btn btn-primary">
+      ◈ Ouvrir l'Add-in
+    </a>
+    <a href="https://github.com/VOTRE-USERNAME/chemai-addin" class="btn btn-sec" target="_blank">
+      ⌥ Voir sur GitHub
+    </a>
+    <a href="docs/README.md" class="btn btn-sec">
+      ▤ Documentation
+    </a>
+  </div>
+
+  <div class="modules-strip">
+    <span class="module-chip hi">PCA</span>
+    <span class="module-chip hi">PLS-1</span>
+    <span class="module-chip hi">K-Means</span>
+    <span class="module-chip hi">Ward</span>
+    <span class="module-chip">Mahalanobis</span>
+    <span class="module-chip">T² Hotelling</span>
+    <span class="module-chip">Q résiduel</span>
+    <span class="module-chip">VIP Scores</span>
+    <span class="module-chip">SVD</span>
+    <span class="module-chip">NIPALS</span>
+    <span class="module-chip hi">Gemini AI</span>
+    <span class="module-chip">Office.js</span>
+  </div>
+</section>
+
+<!-- ═══ FEATURES ═══ -->
+<section id="features">
+  <div class="container">
+    <p class="section-label">Capacités analytiques</p>
+    <h2 class="section-title">Tout ce dont votre laboratoire a besoin</h2>
+    <p class="section-desc">
+      Chaque module est implémenté selon les standards de la chimiométrie analytique,
+      avec des références aux publications fondatrices du domaine.
+    </p>
+
+    <div class="features-grid">
+
+      <div class="feat-card">
+        <span class="feat-icon">◈</span>
+        <div class="feat-title">Analyse en Composantes Principales</div>
+        <p class="feat-desc">
+          Réduction de dimension par SVD. Score Plot, Loading Plot, Scree Plot et Biplot
+          générés automatiquement. Sélection automatique du nombre de composantes (95% variance).
+        </p>
+        <div class="feat-tags">
+          <span class="tag cyan">SVD</span>
+          <span class="tag cyan">NIPALS</span>
+          <span class="tag">T² Hotelling</span>
+          <span class="tag">Q résiduel</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">∿</span>
+        <div class="feat-title">Régression PLS-1</div>
+        <p class="feat-desc">
+          Partial Least Squares avec validation croisée K-Fold. VIP scores pour identifier
+          les variables clés. Prédiction en temps réel sur nouvelles mesures.
+        </p>
+        <div class="feat-tags">
+          <span class="tag cyan">R² · RMSEC · RMSECV</span>
+          <span class="tag orange">VIP ≥ 1</span>
+          <span class="tag">Cross-validation</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">⬡</span>
+        <div class="feat-title">Clustering</div>
+        <p class="feat-desc">
+          K-Means++ avec sélection automatique de k (méthode Elbow + Silhouette).
+          Clustering hiérarchique Ward avec dendrogramme interactif.
+        </p>
+        <div class="feat-tags">
+          <span class="tag cyan">K-Means++</span>
+          <span class="tag">Ward · Complete · Average</span>
+          <span class="tag green">Silhouette</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">⚠</span>
+        <div class="feat-title">Détection d'anomalies</div>
+        <p class="feat-desc">
+          Distance de Mahalanobis avec seuil Chi². T² de Hotelling et Q résiduel
+          dans l'espace PCA. Isolation Forest et LOF via le backend Python.
+        </p>
+        <div class="feat-tags">
+          <span class="tag cyan">Mahalanobis</span>
+          <span class="tag">T² · Q résiduel</span>
+          <span class="tag orange">α = 1%, 5%, 0.1%</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">✦</span>
+        <div class="feat-title">Interprétation par IA</div>
+        <p class="feat-desc">
+          Gemini API génère automatiquement une interprétation scientifique
+          contextualisée pour chaque analyse : PCA, PLS, clustering, anomalies.
+        </p>
+        <div class="feat-tags">
+          <span class="tag cyan">Gemini 2.5 Flash</span>
+          <span class="tag">Français</span>
+          <span class="tag green">Clé API gratuite</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">▤</span>
+        <div class="feat-title">Rapport scientifique HTML</div>
+        <p class="feat-desc">
+          Rapport complet auto-généré avec statistiques, graphiques SVG intégrés,
+          tables de résultats et interprétation IA. Prêt pour impression et archivage.
+        </p>
+        <div class="feat-tags">
+          <span class="tag cyan">HTML auto-contenu</span>
+          <span class="tag">SVG embarqués</span>
+          <span class="tag">Print-friendly</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">⊞</span>
+        <div class="feat-title">Intégration Excel native</div>
+        <p class="feat-desc">
+          Lecture directe de la plage sélectionnée. Export des scores, loadings, VIP et
+          labels de cluster dans des feuilles Excel dédiées. Marquage des outliers.
+        </p>
+        <div class="feat-tags">
+          <span class="tag cyan">Office.js</span>
+          <span class="tag">Import CSV</span>
+          <span class="tag">Export Excel</span>
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">⟳</span>
+        <div class="feat-title">Prétraitement complet</div>
+        <p class="feat-desc">
+          5 méthodes de mise à l'échelle (autoscaling, Pareto, normalisation, centrage).
+          Gestion automatique des valeurs manquantes (imputation ou suppression).
+        </p>
+        <div class="feat-tags">
+          <span class="tag cyan">Autoscaling</span>
+          <span class="tag">Pareto scaling</span>
+          <span class="tag">Min-max</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ LIMITATION BANNER ═══ -->
+<div class="container" style="position:relative;z-index:1;padding:0 24px">
+  <div class="limitation-banner">
+    <div class="lim-icon">ℹ</div>
+    <div>
+      <div class="lim-title">GitHub Pages = Mode autonome uniquement</div>
+      <div class="lim-desc">
+        Sur GitHub Pages, l'Add-in fonctionne en <strong>mode JS pur</strong> — tous les calculs
+        (PCA, PLS, K-Means, Mahalanobis) s'exécutent directement dans le navigateur via <code>chemMath.js</code>.
+        Le backend Python (FastAPI + scikit-learn) est optionnel et nécessite un serveur séparé.
+        Pour activer Isolation Forest, LOF, SVM ou Random Forest :
+        <a href="https://github.com/VOTRE-USERNAME/chemai-addin#backend" target="_blank">
+          déployer le backend sur Railway ou Render →
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ARCHITECTURE ═══ -->
+<section id="architecture">
+  <div class="container">
+    <p class="section-label">Conception technique</p>
+    <h2 class="section-title">Architecture modulaire</h2>
+    <p class="section-desc">
+      Chaque module est indépendant et réutilisable. Le frontend JS pur garantit
+      une confidentialité totale des données — rien n'est envoyé à l'extérieur.
+    </p>
+
+    <div class="arch-grid">
+      <div class="arch-card">
+        <div class="arch-card-title">Frontend — Office.js Add-in</div>
+
+        <div class="arch-item">
+          <span class="arch-item-icon">taskpane.js</span>
+          <div class="arch-item-text">
+            <strong>Orchestrateur UI</strong>
+            <span>Navigation, gestion des panels, coordination des modules</span>
+          </div>
+        </div>
+        <div class="arch-item">
+          <span class="arch-item-icon">chemMath.js</span>
+          <div class="arch-item-text">
+            <strong>Moteur scientifique JS</strong>
+            <span>SVD, PCA, PLS NIPALS, K-Means++, Mahalanobis — zéro dépendance</span>
+          </div>
+        </div>
+        <div class="arch-item">
+          <span class="arch-item-icon">chemCharts.js</span>
+          <div class="arch-item-text">
+            <strong>Générateur SVG</strong>
+            <span>8 types de graphiques scientifiques en SVG vectoriel</span>
+          </div>
+        </div>
+        <div class="arch-item">
+          <span class="arch-item-icon">chemExcel.js</span>
+          <div class="arch-item-text">
+            <strong>API Excel</strong>
+            <span>Lecture sélection, export résultats, marquage outliers</span>
+          </div>
+        </div>
+        <div class="arch-item">
+          <span class="arch-item-icon">chemAI.js</span>
+          <div class="arch-item-text">
+            <strong>Client Gemini</strong>
+            <span>5 prompts scientifiques spécialisés par type d'analyse</span>
+          </div>
+        </div>
+        <div class="arch-item">
+          <span class="arch-item-icon">chemReport.js</span>
+          <div class="arch-item-text">
+            <strong>Rapport HTML</strong>
+            <span>Document scientifique auto-généré, CSS intégré, print-ready</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arch-card">
+        <div class="arch-card-title">Backend Python — FastAPI (optionnel)</div>
+
+        <div class="arch-item">
+          <span class="arch-item-icon">main.py</span>
+          <div class="arch-item-text">
+            <strong>API FastAPI</strong>
+            <span>7 endpoints REST, CORS configuré, middleware d'erreur</span>
+          </div>
+        </div>
+        <div class="arch-item">
+          <span class="arch-item-icon">chem_service.py</span>
+          <div class="arch-item-text">
+            <strong>scikit-learn + SciPy</strong>
+            <span>PCA SVD complet, VIP scores, Isolation Forest, LOF, LDA, SVM, RF</span>
+          </div>
+        </div>
+        <div class="arch-item">
+          <span class="arch-item-icon">schemas.py</span>
+          <div class="arch-item-text">
+            <strong>Pydantic v2</strong>
+            <span>12 schémas de validation — entrées et sorties typées</span>
+          </div>
+        </div>
+        <div class="arch-item">
+          <span class="arch-item-icon">test_api.py</span>
+          <div class="arch-item-text">
+            <strong>25 tests pytest</strong>
+            <span>Couverture complète de tous les endpoints et cas limites</span>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--cyan);margin-bottom:8px;letter-spacing:.06em">DÉMARRAGE RAPIDE</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.8">
+            <span style="color:var(--faint)"># Dans /backend</span><br>
+            <span style="color:var(--green)">pip install -r requirements.txt</span><br>
+            <span style="color:var(--green)">python main.py</span><br>
+            <span style="color:var(--faint)"># → http://localhost:8000/docs</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ INSTALL ═══ -->
+<section id="install">
+  <div class="container">
+    <p class="section-label">Mise en place</p>
+    <h2 class="section-title">Installation en 5 étapes</h2>
+    <p class="section-desc">
+      L'Add-in fonctionne directement depuis GitHub Pages dans un navigateur.
+      Pour l'intégrer dans Excel Desktop, suivez les étapes ci-dessous.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">Étape 01</span>
+        <div class="step-title">Cloner le dépôt</div>
+        <p class="step-desc">Clonez le projet et naviguez dans le dossier.</p>
+        <div class="code-block"><span class="code-cmd">git clone</span> https://github.com/
+  VOTRE-USERNAME/chemai-addin
+<span class="code-cmd">cd</span> chemai-addin</div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">Étape 02</span>
+        <div class="step-title">Installer Node.js</div>
+        <p class="step-desc">Installez les dépendances et générez les certificats SSL locaux.</p>
+        <div class="code-block"><span class="code-cmd">npm install</span>
+<span class="code-cmd">npx</span> office-addin-dev-certs install</div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">Étape 03</span>
+        <div class="step-title">Lancer le serveur local</div>
+        <p class="step-desc">Démarrez webpack-dev-server sur HTTPS (requis par Office.js).</p>
+        <div class="code-block"><span class="code-cmd">npm start</span>
+<span class="code-comment"># → https://localhost:3000</span></div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">Étape 04</span>
+        <div class="step-title">Charger dans Excel</div>
+        <p class="step-desc">Dans Excel : Insérer → Compléments → Mes compléments → sélectionner manifest.xml</p>
+        <div class="code-block"><span class="code-comment"># Excel Desktop</span>
+Insérer → Compléments Office
+→ Télécharger un complément
+→ Sélectionner <span class="code-str">manifest.xml</span></div>
+      </div>
+
+      <div class="step">
+        <span class="step-num">Étape 05 (optionnel)</span>
+        <div class="step-title">Backend Python</div>
+        <p class="step-desc">Pour activer les algorithmes avancés (Isolation Forest, SVM, RF…)</p>
+        <div class="code-block"><span class="code-cmd">cd</span> backend
+<span class="code-cmd">pip install</span> -r requirements.txt
+<span class="code-cmd">python</span> main.py</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ MODULES TABLE ═══ -->
+<section id="modules">
+  <div class="container">
+    <p class="section-label">Référence scientifique</p>
+    <h2 class="section-title">Algorithmes implémentés</h2>
+    <p class="section-desc">
+      Chaque algorithme est documenté avec sa référence originale et ses métriques de sortie.
+    </p>
+
+    <table class="modules-table">
+      <thead>
+        <tr>
+          <th>Module</th>
+          <th>Algorithme</th>
+          <th>Mode JS</th>
+          <th>Métriques</th>
+          <th>Référence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PCA</td>
+          <td>SVD (LAPACK) + déflation itérative</td>
+          <td><span class="tag green">✓ Natif</span></td>
+          <td>Valeurs propres, variance expliquée, T², Q</td>
+          <td>Jolliffe (2002)</td>
+        </tr>
+        <tr>
+          <td>PLS-1</td>
+          <td>NIPALS (Nonlinear Iterative PLS)</td>
+          <td><span class="tag green">✓ Natif</span></td>
+          <td>R²cal, R²cv, RMSEC, RMSECV, VIP</td>
+          <td>Wold et al. (2001)</td>
+        </tr>
+        <tr>
+          <td>K-Means</td>
+          <td>K-Means++ (initialisation optimale)</td>
+          <td><span class="tag green">✓ Natif</span></td>
+          <td>Inertie, Silhouette, Calinski-Harabász</td>
+          <td>Arthur & Vassilvitskii (2007)</td>
+        </tr>
+        <tr>
+          <td>Clustering hiérarchique</td>
+          <td>Ward, Complete, Average, Single</td>
+          <td><span class="tag green">✓ Natif</span></td>
+          <td>Linkage matrix, dendrogramme</td>
+          <td>Ward (1963)</td>
+        </tr>
+        <tr>
+          <td>Mahalanobis</td>
+          <td>Distance Chi² multivariée</td>
+          <td><span class="tag green">✓ Natif</span></td>
+          <td>Score par échantillon, seuil Chi²(n, α)</td>
+          <td>Mahalanobis (1936)</td>
+        </tr>
+        <tr>
+          <td>T² de Hotelling</td>
+          <td>Statistique F dans l'espace PCA</td>
+          <td><span class="tag green">✓ Natif</span></td>
+          <td>T² individuel, limite F-distribution</td>
+          <td>Hotelling (1931)</td>
+        </tr>
+        <tr>
+          <td>Q résiduel</td>
+          <td>Jackson-Mudholkar (1979)</td>
+          <td><span class="tag green">✓ Natif</span></td>
+          <td>Q par échantillon, seuil JM</td>
+          <td>Jackson & Mudholkar (1979)</td>
+        </tr>
+        <tr>
+          <td>Isolation Forest</td>
+          <td>Liu et al. — arbres d'isolation</td>
+          <td><span class="tag orange">Backend Python</span></td>
+          <td>Score d'anomalie, contamination</td>
+          <td>Liu et al. (2008)</td>
+        </tr>
+        <tr>
+          <td>LOF</td>
+          <td>Local Outlier Factor</td>
+          <td><span class="tag orange">Backend Python</span></td>
+          <td>LOF score, voisins k</td>
+          <td>Breunig et al. (2000)</td>
+        </tr>
+        <tr>
+          <td>LDA</td>
+          <td>Analyse Discriminante Linéaire</td>
+          <td><span class="tag orange">Backend Python</span></td>
+          <td>Accuracy, matrice de confusion, F-importance</td>
+          <td>Fisher (1936)</td>
+        </tr>
+        <tr>
+          <td>Random Forest</td>
+          <td>Ensemble de 100 arbres de décision</td>
+          <td><span class="tag orange">Backend Python</span></td>
+          <td>Accuracy CV, feature importance, OOB</td>
+          <td>Breiman (2001)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section id="cta">
+  <div class="cta-glow"></div>
+  <div class="container" style="position:relative;z-index:1">
+    <p class="section-label" style="text-align:center">Prêt à commencer ?</p>
+    <h2 class="section-title" style="text-align:center">Analysez vos données<br>dès maintenant</h2>
+    <p style="text-align:center;max-width:480px;margin:0 auto 32px;font-size:14px;color:var(--dim);line-height:1.7">
+      L'Add-in fonctionne directement dans votre navigateur en mode autonome.
+      Aucun serveur, aucune installation requise pour démarrer.
+    </p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <a href="addin/taskpane.html" class="btn btn-primary">◈ Ouvrir l'Add-in</a>
+      <a href="https://github.com/VOTRE-USERNAME/chemai-addin" class="btn btn-sec" target="_blank">⌥ GitHub</a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-brand">Chem<span>AI</span></div>
+  <ul class="footer-links">
+    <li><a href="addin/taskpane.html">Add-in</a></li>
+    <li><a href="docs/README.md">Documentation</a></li>
+    <li><a href="https://github.com/VOTRE-USERNAME/chemai-addin" target="_blank">GitHub</a></li>
+    <li><a href="https://aistudio.google.com" target="_blank">Clé Gemini</a></li>
+  </ul>
+  <div class="footer-note">Open Source · Office.js · Python FastAPI · scikit-learn</div>
+</footer>
+
+</body>
+</html>
