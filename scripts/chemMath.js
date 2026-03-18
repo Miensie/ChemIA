@@ -265,6 +265,13 @@ const PCA = {
    * @returns PCA result object
    */
   fit(X, nComp = "auto") {
+    // ── Garde-fous d'entrée ──
+    if (!X || X.length < 2) throw new Error("PCA : au moins 2 échantillons requis.");
+    if (!X[0] || X[0].length < 1) throw new Error("PCA : au moins 1 variable requise.");
+
+    // Remplacer les NaN/Inf résiduels par 0
+    X = X.map(row => Array.from(row).map(v => (isFinite(v) && !isNaN(v)) ? v : 0));
+
     const m = X.length, n = X[0].length;
     const maxComp = Math.min(m - 1, n);
     const r = nComp === "auto" ? maxComp : Math.min(nComp, maxComp);
@@ -309,15 +316,15 @@ const PCA = {
     );
 
     return {
-      scores,                             // m × nKeep
-      loadings,                           // nKeep × n
+      // Convertir Float64Array → tableau JS ordinaire pour compatibilité SVG/JSON
+      scores:   scores.map(row => Array.from(row)),     // m × nKeep
+      loadings: loadings.map(row => Array.from(row)),   // nKeep × n
       eigenvalues: eigenvalues.slice(0, nKeep),
       explainedVar: explainedVar.slice(0, nKeep),
       cumulativeVar: cumulativeVar.slice(0, nKeep),
       nComp: nKeep,
       Q, T2,
-      // Seuils F-approximation (non rigoureux, approximation rapide)
-      T2Limit95: nKeep * (m * m - 1) / (m * (m - nKeep)) * 3.0, // approx
+      T2Limit95: nKeep * (m * m - 1) / (m * (m - nKeep)) * 3.0,
     };
   },
 };
@@ -333,6 +340,11 @@ const PLS = {
    * @returns PLS model
    */
   fit(X, y, nComp = 3) {
+    if (!X || X.length < 3) throw new Error("PLS : au moins 3 échantillons requis.");
+    // Nettoyage NaN résiduels
+    X = X.map(row => Array.from(row).map(v => (isFinite(v) && !isNaN(v)) ? v : 0));
+    y = y.map(v => (isFinite(v) && !isNaN(v)) ? v : 0);
+
     const m = X.length, n = X[0].length;
     nComp = Math.min(nComp, Math.min(m - 1, n));
 

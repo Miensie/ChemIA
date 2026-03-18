@@ -328,8 +328,10 @@ function renderPCAVarianceBars() {
 
 function renderPCAChart(type) {
   const wrap = document.getElementById("pca-chart-wrap");
-  const pcX = parseInt(document.getElementById("pca-pc-x").value) || 0;
-  const pcY = parseInt(document.getElementById("pca-pc-y").value) || 1;
+  const pcXRaw = parseInt(document.getElementById("pca-pc-x").value);
+  const pcYRaw = parseInt(document.getElementById("pca-pc-y").value);
+  const pcX = isNaN(pcXRaw) ? 0 : pcXRaw;
+  const pcY = isNaN(pcYRaw) ? 1 : pcYRaw;
   const xHeaders = APP.rawData ? APP.rawData.headers : [];
   const { pcaResult } = APP;
 
@@ -639,10 +641,15 @@ async function handleRunCluster() {
       ["Méthode",     APP.clusterResult.method],
     ].map(([l, v]) => `<div class="stat-item"><div class="stat-lbl">${l}</div><div class="stat-val">${v}</div></div>`).join("");
 
-    // Score plot coloré par cluster
-    if (APP.pcaResult) {
+    // Score plot coloré par cluster (seulement si PCA a au moins 2 composantes)
+    if (APP.pcaResult && APP.pcaResult.nComp >= 2) {
       APP.charts.clusterScatter = ChemCharts.buildScorePlot(
         APP.pcaResult.scores, APP.rawData?.sampleNames, 0, 1,
+        APP.pcaResult.explainedVar, APP.clusterResult.labels
+      );
+    } else if (APP.pcaResult && APP.pcaResult.nComp === 1) {
+      APP.charts.clusterScatter = ChemCharts.buildScorePlot(
+        APP.pcaResult.scores, APP.rawData?.sampleNames, 0, 0,
         APP.pcaResult.explainedVar, APP.clusterResult.labels
       );
     }

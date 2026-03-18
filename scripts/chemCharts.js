@@ -48,7 +48,10 @@ function fmt(v, dec = 2) {
 
 function linearScale(domain, range) {
   const [d0, d1] = domain, [r0, r1] = range;
-  return v => r0 + (v - d0) / (d1 - d0 + 1e-12) * (r1 - r0);
+  const span = d1 - d0;
+  // Guard : si domain est dégénéré (tous les points identiques), retourner le milieu
+  if (Math.abs(span) < 1e-12) return () => (r0 + r1) / 2;
+  return v => r0 + (v - d0) / span * (r1 - r0);
 }
 
 function gridLines(xScale, yScale, ML, MT, CW, CH, nX = 5, nY = 5) {
@@ -80,11 +83,30 @@ function buildScorePlot(scores, sampleNames, pcX, pcY, explVar, clusterLabels) {
   const ML = 52, MR = 24, MT = 28, MB = 44;
   const CW = W - ML - MR, CH = H - MT - MB;
 
-  const xs = scores.map(s => s[pcX]);
-  const ys = scores.map(s => s[pcY]);
+  // Normalise Float64Array ou tableau imbriqué → tableau JS plat
+  const nComp = scores[0] ? (scores[0].length || Object.keys(scores[0]).length) : 1;
+  pcX = Math.min(pcX, nComp - 1);
+  pcY = Math.min(pcY, nComp - 1);
+  if (pcX === pcY && nComp > 1) pcY = pcX === 0 ? 1 : 0;
+
+  const xs = scores.map(s => +s[pcX]);
+  const ys = scores.map(s => +s[pcY]);
+
+  // Garde-fou : si toutes les valeurs sont identiques (scale = 0), ajouter epsilon
+  const xRange = Math.max(...xs) - Math.min(...xs);
+  const yRange = Math.max(...ys) - Math.min(...ys);
+  if (!isFinite(xRange) || !isFinite(yRange)) {
+    return `<svg viewBox="0 0 560 360" xmlns="http://www.w3.org/2000/svg" style="background:${BG}">
+      <text x="280" y="180" text-anchor="middle" fill="${TEXT}" font-size="12" font-family="Syne,sans-serif">Score Plot — données insuffisantes</text></svg>`;
+  }
   const xExt = [Math.min(...xs), Math.max(...xs)];
   const yExt = [Math.min(...ys), Math.max(...ys)];
-  const pad = v => [v[0] - (v[1]-v[0])*.12, v[1] + (v[1]-v[0])*.12];
+  // pad garantit un range > 0 même si tous les points sont identiques
+  const pad = v => {
+    const span = v[1] - v[0];
+    const p = span > 1e-10 ? span * 0.12 : 1;
+    return [v[0] - p, v[1] + p];
+  };
   const [xLo, xHi] = pad(xExt), [yLo, yHi] = pad(yExt);
   const sx = linearScale([xLo, xHi], [ML, ML+CW]);
   const sy = linearScale([yLo, yHi], [MT+CH, MT]);
@@ -103,16 +125,20 @@ function buildScorePlot(scores, sampleNames, pcX, pcY, explVar, clusterLabels) {
     svg += `<line x1="${ML}" y1="${y0}" x2="${ML+CW}" y2="${y0}" stroke="${GRID}" stroke-width="1.2" stroke-dasharray="4,3"/>`;
   }
 
-  // Ellipse de confiance 95% (approximation)
+  // Ellipse de confiance 95% — protégée contre NaN
   const mux = xs.reduce((s,v)=>s+v,0)/xs.length;
   const muy = ys.reduce((s,v)=>s+v,0)/ys.length;
-  const sdx = Math.sqrt(xs.reduce((s,v)=>s+(v-mux)**2,0)/(xs.length-1));
-  const sdy = Math.sqrt(ys.reduce((s,v)=>s+(v-muy)**2,0)/(ys.length-1));
-  const rx = sdx * 2.45 * CW / (xHi - xLo);
-  const ry = sdy * 2.45 * CH / (yHi - yLo);
-  svg += `<ellipse cx="${sx(mux).toFixed(1)}" cy="${sy(muy).toFixed(1)}"
-    rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}"
-    fill="none" stroke="${CYAN}" stroke-width="1" stroke-dasharray="5,3" opacity="0.4"/>`;
+  if (xs.length > 2 && (xHi-xLo) > 1e-10 && (yHi-yLo) > 1e-10) {
+    const sdx = Math.sqrt(xs.reduce((s,v)=>s+(v-mux)**2,0)/(xs.length-1));
+    const sdy = Math.sqrt(ys.reduce((s,v)=>s+(v-muy)**2,0)/(ys.length-1));
+    const rx = sdx * 2.45 * CW / (xHi - xLo);
+    const ry = sdy * 2.45 * CH / (yHi - yLo);
+    if (isFinite(rx) && isFinite(ry) && rx > 0 && ry > 0) {
+      svg += `<ellipse cx="${sx(mux).toFixed(1)}" cy="${sy(muy).toFixed(1)}"
+        rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}"
+        fill="none" stroke="${CYAN}" stroke-width="1" stroke-dasharray="5,3" opacity="0.4"/>`;
+    }
+  }
 
   // Points
   scores.forEach((s, i) => {
@@ -155,8 +181,19 @@ function buildLoadingPlot(loadings, varNames, pcX, pcY, explVar) {
   const ML = 52, MR = 24, MT = 28, MB = 44;
   const CW = W - ML - MR, CH = H - MT - MB;
 
-  const xs = loadings[pcX];
-  const ys = loadings[pcY];
+  // Guard : loadings peut être un tableau de Float64Array ou d'Arrays
+  const nComp = loadings ? loadings.length : 0;
+  if (nComp === 0) {
+    return `<svg viewBox="0 0 560 360" xmlns="http://www.w3.org/2000/svg" style="background:${BG}">
+      <text x="280" y="180" text-anchor="middle" fill="${TEXT}" font-size="12" font-family="Syne,sans-serif">Loading Plot — lancez d'abord la PCA</text></svg>`;
+  }
+
+  pcX = Math.min(pcX, nComp - 1);
+  pcY = Math.min(pcY, nComp - 1);
+  if (pcX === pcY && nComp > 1) pcY = pcX === 0 ? 1 : 0;
+
+  const xs = Array.from(loadings[pcX]).map(Number);
+  const ys = Array.from(loadings[pcY]).map(Number);
   const absMax = Math.max(Math.max(...xs.map(Math.abs)), Math.max(...ys.map(Math.abs))) * 1.2 || 1;
   const sx = linearScale([-absMax, absMax], [ML, ML+CW]);
   const sy = linearScale([-absMax, absMax], [MT+CH, MT]);
@@ -259,9 +296,10 @@ function buildPredVsReal(yReal, yPred, r2, rmse) {
   const ML = 52, MR = 20, MT = 28, MB = 44;
   const CW = W - ML - MR, CH = H - MT - MB;
 
-  const all = [...yReal, ...yPred];
+  const all = [...yReal, ...yPred].filter(v => isFinite(v));
+  if (!all.length) return `<svg viewBox="0 0 440 360" xmlns="http://www.w3.org/2000/svg" style="background:${BG}"><text x="220" y="180" text-anchor="middle" fill="${TEXT}" font-size="12">Pas de données PLS</text></svg>`;
   const lo = Math.min(...all), hi = Math.max(...all);
-  const pad = (hi - lo) * 0.1;
+  const pad = Math.max((hi - lo) * 0.1, 1e-6);
   const sx = linearScale([lo-pad, hi+pad], [ML, ML+CW]);
   const sy = linearScale([lo-pad, hi+pad], [MT+CH, MT]);
 
@@ -481,7 +519,8 @@ function buildControlChart(scores, threshold, sampleNames, title) {
   const CW = W - ML - MR, CH = H - MT - MB;
 
   const m = scores.length;
-  const maxY = Math.max(Math.max(...scores), threshold) * 1.15;
+  if (!m) return `<svg viewBox="0 0 560 280" xmlns="http://www.w3.org/2000/svg" style="background:${BG}"><text x="280" y="140" text-anchor="middle" fill="${TEXT}" font-size="12">Aucune donnée</text></svg>`;
+  const maxY = Math.max(Math.max(...scores), threshold, 1e-6) * 1.15;
   const sx = i => ML + (i + 0.5) * CW / m;
   const sy = v => MT + CH - v / maxY * CH;
 
