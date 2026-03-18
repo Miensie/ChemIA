@@ -17,11 +17,11 @@
   <DefaultLocale>fr-FR</DefaultLocale>
   <DisplayName DefaultValue="ChemAI — Chimiométrie"/>
   <Description DefaultValue="Analyse multivariée scientifique pour laboratoires analytiques"/>
-  <IconUrl DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-32.png"/>
-  <HighResolutionIconUrl DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-64.png"/>
-  <SupportUrl DefaultValue="https://github.com/VOTRE-USERNAME/chemai-addin"/>
+  <IconUrl DefaultValue="https://miensie.github.io/ChemIA/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="https://miensie.github.io/ChemIA/icon-64.png"/>
+  <SupportUrl DefaultValue="https://github.com/miensie/ChemIA"/>
   <AppDomains>
-    <AppDomain>https://VOTRE-USERNAME.github.io</AppDomain>
+    <AppDomain>https://miensie.github.io</AppDomain>
   </AppDomains>
 
   <Hosts>
@@ -29,7 +29,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/addin/taskpane.html"/>
+    <SourceLocation DefaultValue="https://miensie.github.io/ChemIA/addin/taskpane.html"/>
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -78,14 +78,14 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://miensie.github.io/ChemIA/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://miensie.github.io/ChemIA/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://miensie.github.io/ChemIA/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/VOTRE-USERNAME/chemai-addin"/>
-        <bt:Url id="Commands.Url" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/addin/commands.html"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://VOTRE-USERNAME.github.io/chemai-addin/addin/taskpane.html"/>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://github.com/miensie/ChemIA"/>
+        <bt:Url id="Commands.Url" DefaultValue="https://miensie.github.io/ChemIA/addin/commands.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://miensie.github.io/ChemIA/addin/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Bienvenue dans ChemAI"/>
