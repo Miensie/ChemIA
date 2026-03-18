@@ -92,7 +92,7 @@ Résultats :
 - PC2 : ${pcaResult.explainedVar[1]?.toFixed(1) ?? 'N/A'}% de variance expliquée
   Variables dominantes : ${top3Vars_PC2.map(v => `${v.name} (loading: ${v.val})`).join(', ')}
 - Variance totale expliquée par ${pcaResult.nComp} composantes : ${pcaResult.cumulativeVar[pcaResult.nComp-1]?.toFixed(1)}%
-- Valeurs propres : ${pcaResult.eigenvalues.map(e => e.toFixed(3)).join(', ')}
+- Valeurs propres : ${pcaResult.eigenvalues.map(e => (isFinite(e) ? e.toFixed(3) : 'N/A')).join(', ')}
 - Noms des variables : ${varNames.join(', ')}
 
 Fournis une interprétation chimiométrique complète :
@@ -140,23 +140,42 @@ Fournis une interprétation du modèle PLS :
    * Interprétation clustering
    */
   async interpretClusters(clusterResult, varNames, method) {
-    const { k, inertia, silhouette, centroids } = clusterResult;
+    // Extraire les champs avec fallbacks robustes
+    const k         = clusterResult.k ?? clusterResult.k;
+    const inertia   = clusterResult.inertia  ?? null;
+    const silhouette= clusterResult.silhouette ?? clusterResult.silhouette_score ?? null;
+    const centroids = Array.isArray(clusterResult.centroids) ? clusterResult.centroids : [];
 
-    const centroidDesc = centroids.slice(0, 4).map((c, ci) => {
-      const top2 = varNames
-        .map((name, j) => ({ name, v: c[j] }))
-        .sort((a, b) => Math.abs(b.v) - Math.abs(a.v))
-        .slice(0, 3)
-        .map(d => `${d.name}=${d.v.toFixed(2)}`);
-      return `Cluster ${ci+1}: [${top2.join(', ')}]`;
-    }).join('\n');
+    // Description des centroïdes — protégée contre dimension réduite et valeurs undefined
+    let centroidDesc = '';
+    if (centroids.length > 0) {
+      centroidDesc = centroids.slice(0, 4).map((c, ci) => {
+        const cArr = Array.from(c);  // Float64Array safe
+        const top2 = varNames
+          .slice(0, cArr.length)     // limiter aux dimensions disponibles
+          .map((name, j) => {
+            const val = cArr[j];
+            const fmtVal = (val !== undefined && isFinite(val)) ? val.toFixed(2) : 'N/A';
+            return { name, fmtVal, abs: Math.abs(val || 0) };
+          })
+          .sort((a, b) => b.abs - a.abs)
+          .slice(0, 3)
+          .map(d => `${d.name}=${d.fmtVal}`);
+        return `Cluster ${ci+1}: [${top2.join(', ')}]`;
+      }).join('\n');
+    } else {
+      centroidDesc = '(centroïdes non disponibles — méthode hiérarchique)';
+    }
+
+    const silStr     = silhouette != null ? silhouette.toFixed(3) : 'N/A';
+    const inertiaStr = inertia    != null ? inertia.toFixed(1)    : 'N/A';
 
     const prompt = `
 Clustering ${method || 'K-Means'} sur données chimiométriques :
 - Nombre de clusters : ${k}
-- Coefficient Silhouette : ${silhouette?.toFixed(3) || 'N/A'} (idéal > 0.5)
-- Inertie intra-clusters : ${inertia?.toFixed(1) || 'N/A'}
-- Variables : ${varNames.join(', ')}
+- Coefficient Silhouette : ${silStr} (idéal > 0.5)
+- Inertie intra-clusters : ${inertiaStr}
+- Variables : ${varNames.slice(0, 15).join(', ')}${varNames.length > 15 ? '…' : ''}
 
 Profils des centroïdes :
 ${centroidDesc}
